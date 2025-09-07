@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checker de Inicio de Sesión Outlook con Archivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .account-item {
+            margin-bottom: 10px;
+        }
+        .result-item {
+            font-size: 0.875rem;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="container mx-auto max-w-2xl bg-white shadow-lg rounded-lg p-6 mt-10">
+        <h1 class="text-2xl font-bold text-center text-blue-600 mb-4">Checker de Inicio de Sesión Outlook</h1>
+        <p class="text-sm text-gray-600 text-center mb-6">Ingresa cuentas manualmente o sube un archivo .txt (formato: email:contraseña por línea) para verificar múltiples cuentas. Nota: Simulación educativa; en producción, usa OAuth.</p>
+        
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Subir Archivo de Cuentas (.txt)</label>
+            <input type="file" id="fileInput" accept=".txt" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            <p class="text-xs text-gray-500 mt-1">Ejemplo de contenido del archivo: usuario1@outlook.com:pass123<br>usuario2@outlook.com:pass456</p>
+        </div>
+        
+        <div id="manualAccounts" class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">O Agrega Cuentas Manualmente</h2>
+            <div id="accounts" class="space-y-4">
+                <div class="account-item">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Correo Electrónico</label>
+                            <input type="email" class="email-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="usuario@outlook.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+                            <input type="password" class="password-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Contraseña">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button id="addAccount" class="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                Agregar Cuenta +
+                <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/608820f4-5f01-4f31-bc01-3d5cdaee5d3c.png" alt="Icono de agregar: círculo verde con signo más blanco, indicando adición de nuevo elemento a una lista o formulario" class="inline ml-1" />
+            </button>
+            <button id="clearAll" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Limpiar Todo</button>
+        </div>
+        
+        <button id="checkButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded mb-4">
+            Verificar Cuentas
+            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/20201654-92b2-47a5-b9c5-08941c053dd2.png" alt="Icono de verificar: flecha azul apuntando a un checkmark verde, simbolizando proceso de verificación o aprobación" class="inline ml-1" />
+        </button>
+        
+        <div id="results" class="mt-4 hidden">
+            <h2 class="text-lg font-semibold mb-2">Resultados:</h2>
+            <div id="resultList" class="space-y-2"></div>
+        </div>
+        
+        <div class="mt-6 p-4 bg-yellow-100 border border-yellow-400 rounded">
+            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/f919416e-8720-4ae3-b9c8-5df5f7caebdc.png" alt="Icono de advertencia: triángulo amarillo con signo de exclamación, indicando precaución o riesgo de seguridad" class="inline mr-2" />
+            <strong>Advertencia Importante:</strong> Esta es una simulación educativa. No uses para acceder a cuentas sin autorización; viola políticas de Microsoft y puede ser ilegal. Usa OAuth para acceso legítimo.
+        </div>
+        
+        <div class="mt-4 p-4 bg-blue-100 border border-blue-400 rounded">
+            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/45101b67-13df-4334-8c2d-91812df88a84.png" alt="Icono de información: círculo azul con letra 'i' blanca, representando detalles informativos o consejos útiles" class="inline mr-2" />
+            <strong>Nota Técnica:</strong> Verificación directa de contraseñas no es posible ni segura; simulación solo para fines demostrativos.
+        </div>
+    </div>
+
+    <script>
+        let accountCount = 1;
+        let accountsData = []; // Array de {email, password}
+
+        document.getElementById('fileInput').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = e.target.result;
+                    const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+                    accountsData = lines.map(line => {
+                        const [email, password] = line.split(':');
+                        if (!email || !password) {
+                            alert('Formato inválido en el archivo. Usa email:contraseña por línea.');
+                            return null;
+                        }
+                        return { email: email.trim(), password: password.trim() };
+                    }).filter(account => account !== null);
+                    
+                    if (accountsData.length === 0) {
+                        alert('No se encontraron cuentas válidas en el archivo.');
+                    } else {
+                        alert(`Cargadas ${accountsData.length} cuentas desde el archivo.`);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('addAccount').addEventListener('click', function() {
+            accountCount++;
+            const accountsDiv = document.getElementById('accounts');
+            const newAccount = document.createElement('div');
+            newAccount.className = 'account-item';
+            newAccount.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Correo Electrónico ${accountCount}</label>
+                        <input type="email" class="email-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="usuario${accountCount}@outlook.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Contraseña ${accountCount}</label>
+                        <input type="password" class="password-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Contraseña">
+                    </div>
+                </div>
+            `;
+            accountsDiv.appendChild(newAccount);
+        });
+
+        document.getElementById('clearAll').addEventListener('click', function() {
+            while (accountCount > 1) {
+                const accountsDiv = document.getElementById('accounts');
+                const lastItem = accountsDiv.lastElementChild;
+                if (lastItem) accountsDiv.removeChild(lastItem);
+                accountCount--;
+            }
+            // Limpiar campos
+            document.querySelectorAll('.email-input').forEach(input => input.value = '');
+            document.querySelectorAll('.password-input').forEach(input => input.value = '');
+            document.getElementById('results').classList.add('hidden');
+            accountsData = [];
+        });
+
+        document.getElementById('checkButton').addEventListener('click', function() {
+            const resultList = document.getElementById('resultList');
+            const resultsDiv = document.getElementById('results');
+            
+            resultList.innerHTML = '';
+            
+            // Combinar accountsData del archivo con los manuales
+            // Primero, agrega los manuales si hay
+            const manualEmails = document.querySelectorAll('.email-input');
+            const manualPasswords = document.querySelectorAll('.password-input');
+            for (let i = 0; i < manualEmails.length; i++) {
+                const email = manualEmails[i].value;
+                const password = manualPasswords[i].value;
+                if (email && password) {
+                    accountsData.push({ email, password });
+                }
+            }
+            
+            if (accountsData.length === 0) {
+                alert('No hay cuentas para verificar. Sube un archivo o agrega cuentas manualmente.');
+                return;
+            }
+            
+            accountsData.forEach((account, index) => {
+                const { email, password } = account;
+                
+                // Simulación de verificación (NO ACCEDE REALMENTE A OUTLOOK)
+                const isSuccess = Math.random() > 0.3; // 70% éxito simulado
+                
+                const resultItem = document.createElement('div');
+                resultItem.className = `result-item p-2 rounded justify-between`;
+                
+                if (isSuccess) {
+                    resultItem.className += ' bg-green-100 text-green-700';
+                    resultItem.innerHTML = `<strong>Cuenta ${index + 1} (${email}):</strong> Inicio exitoso. Disseccados correos relacionados con PlayStation (simulado).`;
+                } else {
+                    resultItem.className += ' bg-red-100 text-red-700';
+                    resultItem.innerHTML = `<strong>Cuenta ${index + 1} (${email}):</strong> Fallo en inicio. Credenciales incorrectas (simulado).`;
+                }
+                
+                resultList.appendChild(resultItem);
+            });
+            
+            resultsDiv.classList.remove('hidden');
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        });
+    </script>
+</body>
+</html>
+</content>
+</create_file>
